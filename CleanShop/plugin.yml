@@ -20,21 +20,9 @@ commands:
       description: Lists all shops
       usage: /listShops
       permission-message: You don't have permission!
-   addShopItem:
-      description: Adds item to your shop. /asi works the same way.
-      usage: /addShopItem <item> [dataValue] [shop]
-      aliases: [asi]
-      permission: cleanshop.addshopitem
-      permission-message: You don't have permission!
-   removeShopItem:
-      description: Removes item from your shop. /rsi works the same way.
-      usage: /removeShopItem <item> [dataValue] [shop]
-      aliases: [rsi]
-      permission: cleanshop.removeshopitem
-      permission-message: You don't have permission!
    searchShops:
       description: Returns a list of all shops with the given item
-      usage: /searchShops <item> [dataValue]
+      usage: /searchShops <item>
       permission-message: You don't have permission!
    setShopTeleport:
       description: Sets the shop's teleport location. /sst works the same way.

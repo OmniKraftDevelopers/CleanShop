@@ -22,11 +22,13 @@ import org.bukkit.ChatColor;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.World;
+import org.bukkit.block.Block;
+import org.bukkit.block.Chest;
+import org.bukkit.block.Sign;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
-import org.bukkit.material.MaterialData;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -35,13 +37,17 @@ import com.sk89q.worldguard.bukkit.WorldGuardPlugin;
 import com.sk89q.worldguard.protection.ApplicableRegionSet;
 import com.sk89q.worldguard.protection.regions.ProtectedRegion;
  
-public final class CleanShop extends JavaPlugin {
+public final class CleanShop extends JavaPlugin{
 		public boolean loadedFile=false;
 		public Vector<Shop> shops = new Vector<Shop>();
 		public WorldGuardPlugin worldGuard;
 		public Vector<NameToID> nameToIDs = new Vector<NameToID>();
 		int waitToCopyTimer=0;
 		int tickMethodID;
+		
+		//TODO: make stock signs only invalidate chests if they're actually attached to them
+		//TODO: make placing a sign with the stock keywords check if it's on a chest and recount stock if so
+		//TODO: double chests are weird if you put the sign on the wrong side
 
 		public File getShopFile()
 		{
@@ -110,10 +116,11 @@ public final class CleanShop extends JavaPlugin {
 	 			getServer().getPluginManager().disablePlugin(this);
 	 			return;
 	 		}
-	 		
+	 		getServer().getPluginManager().registerEvents(new EventListener(this), this);
+
+			loadShops();
 	    }
 	 	
-	 	@SuppressWarnings("deprecation")
 		public void saveShops()
 	 	{
 	 		try (Writer writer = new BufferedWriter(new OutputStreamWriter(
@@ -128,12 +135,12 @@ public final class CleanShop extends JavaPlugin {
 	 					loca="LOCATION:"+loc.getWorld().getName() + ":" + loc.getX() + ":" + loc.getY() + ":" + loc.getZ()+
 	 					":"+ loc.getYaw()+":"+loc.getPitch()+ ";";
 	 				String items="";
-	 				if(s.getItems().size()>0)
+	 				if(s.getStock().size()>0)
 	 					items="ITEMS:";
-	 				for(int i=0;i<s.getItems().size();i++)
+	 				for(int i=0;i<s.getStock().size();i++)
 	 				{
-	 					items+=s.getItems().get(i).getType().name()+"-"+s.getItems().get(i).getData().getData();
-	 					if(i==s.getItems().size()-1)
+	 					items+=s.getStock().get(i).name();
+	 					if(i==s.getStock().size()-1)
 	 						items+=";";
 	 					else
 	 						items+=":";
@@ -151,7 +158,6 @@ public final class CleanShop extends JavaPlugin {
 			} 
 	 	}
 	 	
-	 	@SuppressWarnings("deprecation")
 		public void loadShops()
 	 	{
 	 		loadedFile=true;
@@ -166,7 +172,7 @@ public final class CleanShop extends JavaPlugin {
 	 		        String[] all = line.split(";");
 	 		        String SHOP_NAME=all[0];
 	 		        Location LOCATION=null;
-	 		        Vector<ItemStack> ITEMS=null;
+	 		        Vector<Material> ITEMS=null;
 	 		        //Name, location, items
  		        	World w=Bukkit.getWorld("world");
 	 		        for(String s:all)
@@ -184,15 +190,12 @@ public final class CleanShop extends JavaPlugin {
 		 		        	else if(s.startsWith("ITEMS:"))
 		 		        	{
 	 		        			String[] args = s.split(":");
-	 		        			ITEMS = new Vector<ItemStack>();
+	 		        			ITEMS = new Vector<Material>();
 	 		        			for(String a:args)
 	 		        			{
 	 		        				if(a!=args[0])
 	 		        				{
-		 		        				String[] it=a.split("-");
-	
-										MaterialData md = new MaterialData(matchMaterial(it[0]),Byte.parseByte(it[1]));
-		 		        				ITEMS.add(md.toItemStack());
+		 		        				ITEMS.add(matchMaterial(a));
 	 		        				}
 	 		        			}
 		 		        	}
@@ -205,10 +208,7 @@ public final class CleanShop extends JavaPlugin {
 	 		        if(LOCATION!=null)
 	 		        	s.setLocation(LOCATION);
 	 		        if(ITEMS!=null)
-		 		        for(ItemStack i:ITEMS)
-		 		        {
-		 		        	s.addItem(i.getType().name(), i.getData().getData());
-		 		        }
+		 		        s.setStock(ITEMS);
 	 		    }
 	 		} catch (Exception e) {
 				e.printStackTrace();
@@ -233,101 +233,6 @@ public final class CleanShop extends JavaPlugin {
 	    	return WGBukkit.getRegionManager(location.getWorld()).getApplicableRegions(location);
 	    }
 	    
-	    public boolean addShopItem(Player player,String item)
-	    {
-	    	return addShopItem(player,item,"0");
-	    }
-	    
-	    public boolean addShopItem(Player player,String item,String data)
-	    {
-	    	byte dat=0;
-	    	try{
-	    	dat=Byte.parseByte(data);
-	    	}catch(Exception e)
-	    	{
-	    		player.sendMessage(ChatColor.RED+"You must use a valid number for data values.");
-	    		return true;
-	    	}
-	    	for(Shop s:shops)
-	    	{
-	    		if(s.getRegion().getMembers().getUniqueIds().contains(player.getUniqueId()))
-	    		{
-	    			if(s.hasItem(matchMaterial(item),dat))
-	    			{
-						player.sendMessage(ChatColor.RED+item+" is already in that shop!");
-	    				return false;
-	    			}
-	    			s.addItem(item,dat);
-					player.sendMessage(item+" added to shop!");
-	    			return true;
-	    		}
-	    	}
-	    	return false;
-	    }
-	    
-	    public boolean removeShopItem(Player player,String item,String data)
-	    {
-	    	byte dat=0;
-	    	try{
-	    	dat=Byte.parseByte(data);
-	    	}catch(Exception e)
-	    	{
-	    		player.sendMessage(ChatColor.RED+"You must use a valid number for data values.");
-	    		return true;
-	    	}
-	    	for(Shop s:shops)
-	    	{
-	    		if(s.getRegion().getMembers().getUniqueIds().contains(player.getUniqueId()))
-	    		{
-	    			if(!s.hasItem(matchMaterial(item),dat))
-	    			{
-						player.sendMessage(ChatColor.RED+item+" isn't in that shop!");
-	    				return false;
-	    			}
-	    			s.removeItem(item,dat);
-					player.sendMessage(item+" removed from shop!");
-	    			return true;
-	    		}
-	    	}
-	    	return false;
-	    }
-
-	    public void addShopItem(Player player,Shop s,String item, String data)
-	    {
-	    	byte dat=0;
-	    	try{
-	    	dat=Byte.parseByte(data);
-	    	}catch(Exception e)
-	    	{
-	    		player.sendMessage(ChatColor.RED+"You must use a valid number for data values.");
-	    		return;
-	    	}
-	    	s.addItem(item,dat);
-			player.sendMessage(item+" added to shop!");
-	    }
-	    public void removeShopItem(Player player,Shop s,String item, String data)
-	    {
-	    	byte dat=0;
-	    	try{
-	    	dat=Byte.parseByte(data);
-	    	}catch(Exception e)
-	    	{
-	    		player.sendMessage(ChatColor.RED+"You must use a valid number for data values.");
-	    		return;
-	    	}
-			player.sendMessage(item+" removed from shop!");
-	    	s.removeItem(item,dat);
-	    }
-
-	    public void addShopItem(Player player,Shop s,String item)
-	    {
-	    	addShopItem(player,s,item,"0");
-	    }
-	    public void removeShopItem(Shop s,String item)
-	    {
-	    	s.removeItem(item);
-	    }
-	    
 	    public String getPlayer(UUID id)
 	    {
 	    	for(NameToID n:nameToIDs)
@@ -344,6 +249,7 @@ public final class CleanShop extends JavaPlugin {
 			} catch (Exception e) {
 				e.printStackTrace();
 			}
+			//System.out.println("P: "+p);
 
 			if(p!=null&&!p.equals(""))
 				this.addNameUUID(id, p);
@@ -373,20 +279,6 @@ public final class CleanShop extends JavaPlugin {
 	    			return;
 	    	}
 	    	nameToIDs.add(new NameToID(id,name));
-	    }
-	    
-	    public boolean removeShopItem(Player player,String item)
-	    {
-	    	for(Shop s:shops)
-	    	{
-	    		if(s.getRegion().getMembers().getUniqueIds().contains(player.getUniqueId()))
-	    		{
-					player.sendMessage(item+" removed from shop!");
-	    			s.removeItem(item);
-	    			return true;
-	    		}
-	    	}
-	    	return false;
 	    }
 	    
 	    public boolean hasItemPermissions(Player player, Shop shop)
@@ -459,40 +351,98 @@ public final class CleanShop extends JavaPlugin {
 	    
 	    public Vector<Shop> getShopsWithItem(Player player,String s)
 	    {
-			return getShopsWithItem(player,s,null);
-	    }
-	    
-	    public Vector<Shop> getShopsWithItem(Player player,String s, String data)
-	    {
-	    	byte dat=0;
-	    	if(data==null)
-	    	{
-	    		dat=-1;
-	    	}
-	    	else
-	    	{
-		    	try{
-		    	dat=Byte.parseByte(data);
-		    	}catch(Exception e)
-		    	{
-		    		player.sendMessage(ChatColor.RED+"You must use a valid number for data values.");
-		    		return new Vector<Shop>();
-		    	}
-	    	}
 			Material m = matchMaterial(s);
 			Vector<Shop> ss=new Vector<Shop>();
 			for(Shop sh:shops)
 			{
-				if(sh.hasItem(m,dat))
+				if(sh.hasItem(m))
 					ss.add(sh);
 			}
 			return ss;
 	    }
 	    
-	    public boolean onCommand(CommandSender sender, Command cmd, String label, String[] args) {
+	    public void calculateShopStock(Shop s)
+	    {
+	    	
+	    	ProtectedRegion region=s.getRegion();
+	    	 int xMin = region.getMinimumPoint().getBlockX();
+	  
+	         int xMax = region.getMaximumPoint().getBlockX();
+	         int yMax = region.getMaximumPoint().getBlockY();
+	         int zMax = region.getMaximumPoint().getBlockZ();
+	         
+	         Vector<Material> stock = new Vector<Material>();
+	         //Iterate through every block in the shop's region
+	         for(;xMin<=xMax;xMin++)
+	         {
+		         int yMin = region.getMinimumPoint().getBlockY();
+	             for(;yMin<=yMax;yMin++)
+	             {
+	    	         int zMin = region.getMinimumPoint().getBlockZ();
+	                 for(;zMin<=zMax;zMin++)
+	                 {
+	                     Block loc= (Block) new Location(s.getLocation().getWorld(), xMin, yMin, zMin).getBlock();
+	                    // System.out.println("("+xMin+", "+yMin+", "+zMin+"): "+loc.getType());
+	                     
+	                     //If it's a chest, make sure it doesn't have a "this is stock"-type sign on it
+	                     if(loc.getType()==Material.CHEST)
+	                     {
+	                    	 Chest sc = (Chest) loc.getState();
+	                    	 if(!isStockChest(sc))
+	                    	 {
+		                         for(ItemStack i:sc.getBlockInventory().getContents())
+		                         {
+		                        	 if(i!=null&&i.getType()!=null)
+		                        	 {
+		                        		 //Add every item that isn't named or a diamond.
+			                        	 if(!stock.contains(i.getType())&&
+			                        			 i.getItemMeta().getDisplayName()==null&&
+			                        			 i.getType()!=Material.DIAMOND)
+			                        	 {
+			                        		 stock.add(i.getType());
+			                        		 System.out.println("Added "+i.getType());
+			                        	 }
+		                        	 }
+		                         }
+	                    	 }
+	                     }
+	                 }
+	             }
+	         }
+	         s.setStock(stock);
+	         saveShops();
+	    }
+	    
+	    /**
+	     * @param sc - Chest
+	     * @return If any signs attached to the chest say things like "stock"/"supplies"
+	     */
+	    private boolean isStockChest(Chest sc) {
+	    	Vector<Sign> signs = new Vector<Sign>();
+	    	Location[] loc=new Location[]{
+	    			sc.getLocation().clone().add(1, 0, 0),
+	    			sc.getLocation().clone().add(-1, 0, 0),
+	    			sc.getLocation().clone().add(0, 0, 1),
+	    			sc.getLocation().clone().add(0, 0, -1)
+	    	};
+	    	for(Location loc1:loc)
+		    	if(loc1.getBlock().getState() instanceof Sign&&loc1.getBlock().getType()==Material.WALL_SIGN)
+		    	{
+		    		signs.add((Sign)loc1.getBlock().getState());
+		    	}
+	    	for(Sign s:signs)
+	    	{
+	    		for(String ss:s.getLines())
+	    		{
+	    			if(ss.toLowerCase().contains("stock")||ss.toLowerCase().contains("supply")||ss.toLowerCase().contains("supplies"))
+	    				return true;
+	    		}
+	    	}
+			return false;
+		}
+	    
+		public boolean onCommand(CommandSender sender, Command cmd, String label, String[] args) {
 	    	try{
-	    		if(!loadedFile)
-	    			loadShops();
 	    	if (cmd.getName().equalsIgnoreCase("createshop")) {
 	    		if(sender instanceof Player)
 	    		{
@@ -617,156 +567,9 @@ public final class CleanShop extends JavaPlugin {
 	    				return true;
 	    			}
 	    		}
-	    	}else if (cmd.getName().equalsIgnoreCase("addshopitem")||cmd.getName().equalsIgnoreCase("asi"))
-	    	{
-	    		if(sender instanceof Player)
-	    		{
-	    			if(args.length==1||args.length==2)
-	    			{
-	    				if(matchMaterial(args[0])==null)
-	    				{
-	    					sender.sendMessage(ChatColor.RED+"No item called "+args[0]+" exists.");
-	    				}
-	    				else
-	    				{
-
-		    				Vector<Shop> hops=getOwnedShops((Player)sender);
-		    				if(hops.size()==0)
-		    				{
-	    						sender.sendMessage(ChatColor.RED+"You don't own any shops!");
-	    						return true;
-		    				}
-		    				else if(hops.size()>1)
-		    				{
-	    						sender.sendMessage(ChatColor.RED+"You own more than one shop! You must specify which one you want using /addShopItem <item> [dataValue] [shop].");
-	    						String s="";
-	    						for(Shop sh:hops)
-	    						{
-	    							s+=sh.getRegion().getId()+", ";
-	    						}
-	    						sender.sendMessage("Here are the shops you own: "+s);
-	    						return true;
-		    				}
-		    				else{
-		    					if((args.length==1?addShopItem((Player)sender,args[0]):addShopItem((Player)sender,args[0],args[1])))
-		    					{
-		    			    		saveShops();
-		    					}
-		    					else
-		    						sender.sendMessage(ChatColor.RED+"You don't own any shops!");
-		    				}
-	    				}
-	    				return true;
-	    			}else if(args.length==3)
-	    			{
-
-	    				Shop s=null;
-		    			for(Shop ss:shops)
-		    			{
-		    				if(ss.getRegion().getId().equalsIgnoreCase(args[2]))
-		    				{
-		    					s=ss;
-		    					break;
-		    				}
-		    			}
-	    				if(matchMaterial(args[0])==null)
-	    				{
-	    					sender.sendMessage(ChatColor.RED+"No item called "+args[0]+" exists.");
-	    				}
-	    				else if(s==null)
-	    				{
-	    					sender.sendMessage(ChatColor.RED+"No shop called "+args[2]+" exists.");
-	    				}
-	    				else
-	    				{
-	    					if(hasItemPermissions((Player)sender, s))
-	    					{
-		    					addShopItem((Player)sender,s,args[0],args[1]);
-		    		    		saveShops();
-	    					}
-	    					else
-	    						sender.sendMessage("You don't have permissions to edit shop "+args[2]+"!");
-	    				}
-	    				return true;
-	    			}
-	    		}
-	    	}
-	    	else if (cmd.getName().equalsIgnoreCase("removeshopitem")||cmd.getName().equalsIgnoreCase("rsi"))
-	    	{
-	    		if(sender instanceof Player)
-	    		{
-	    			if(args.length==1||args.length==2)
-	    			{
-	    				if(matchMaterial(args[0])==null)
-	    				{
-	    					sender.sendMessage(ChatColor.RED+"No item called "+args[0]+" exists.");
-	    				}
-	    				else
-	    				{
-
-		    				Vector<Shop> hops=getOwnedShops((Player)sender);
-		    				if(hops.size()==0)
-		    				{
-	    						sender.sendMessage(ChatColor.RED+"You don't own any shops!");
-	    						return true;
-		    				}
-		    				else if(hops.size()>1)
-		    				{
-	    						sender.sendMessage(ChatColor.RED+"You own more than one shop! You must specify which one you want using /addShopItem <item> [dataValue] [shop].");
-	    						String s="";
-	    						for(Shop sh:hops)
-	    						{
-	    							s+=sh.getRegion().getId()+", ";
-	    						}
-	    						sender.sendMessage("Here are the shops you own: "+s);
-	    						return true;
-		    				}
-		    				else{
-		    					if((args.length==1?removeShopItem((Player)sender,args[0]):removeShopItem((Player)sender,args[0],args[1])))
-		    					{
-		    			    		saveShops();
-		    					}
-		    					else
-		    						sender.sendMessage(ChatColor.RED+"Failed to remove "+args[0]+" from shop.");
-		    				}
-	    				}
-	    				return true;
-	    			}else if(args.length==3)
-	    			{
-
-	    				Shop s=null;
-		    			for(Shop ss:shops)
-		    			{
-		    				if(ss.getRegion().getId().equalsIgnoreCase(args[2]))
-		    				{
-		    					s=ss;
-		    					break;
-		    				}
-		    			}
-	    				if(matchMaterial(args[0])==null)
-	    				{
-	    					sender.sendMessage(ChatColor.RED+"No item called "+args[0]+" exists.");
-	    				}
-	    				else if(s==null)
-	    				{
-	    					sender.sendMessage(ChatColor.RED+"No shop called "+args[2]+" exists.");
-	    				}
-	    				else
-	    				{
-	    					if(hasItemPermissions((Player)sender, s))
-	    					{
-		    					removeShopItem((Player)sender,s,args[0],args[1]);
-		    		    		saveShops();
-	    					}
-	    					else
-	    						sender.sendMessage("You don't have permissions to edit shop "+args[2]+"!");
-	    				}
-	    				return true;
-	    			}
-	    		}
 	    	}
 	    	else if (cmd.getName().equalsIgnoreCase("searchshops")) {
-	    		if(args.length==1||args.length==2)
+	    		if(args.length==1)
 	    		{
 					if(matchMaterial(args[0])==null)
 					{
@@ -774,7 +577,7 @@ public final class CleanShop extends JavaPlugin {
 					}
 					else
 					{
-						Vector<Shop> theShops = args.length==1?this.getShopsWithItem((Player)sender,args[0]):this.getShopsWithItem((Player)sender,args[0],args[1]);
+						Vector<Shop> theShops = this.getShopsWithItem((Player)sender,args[0]);
 						sender.sendMessage("Shops that have "+args[0]+": ");
 						String msg="";
 						for(Shop s:theShops)
@@ -954,8 +757,10 @@ public final class CleanShop extends JavaPlugin {
 		    					{
 		    						for(UUID i:sh.getRegion().getMembers().getUniqueIds())
 		    						{
+		    							//System.out.println(i);
 		    							{
 			    							String n=this.getPlayer(i);
+			    							//System.out.println(n);
 			    							if(n==null)
 			    								continue;
 			    							if(n.equalsIgnoreCase(args[0]))
