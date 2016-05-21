@@ -20,8 +20,8 @@ public static String getNameByUUID(String uuid) {
             //System.out.println("NAME BY UUID "+j);
             JSONArray o=new JSONArray(j);
 			String name=o.getJSONObject(o.length()-1).getString("name");
-			if(name==null||name.equals(""))
-				//System.out.println("HE DOESN'T EXIST. "+uuid);
+			/*if(name==null||name.equals(""))
+				System.out.println("HE DOESN'T EXIST. "+uuid);*/
             return name;
         } catch (Exception e) {
             e.printStackTrace();
