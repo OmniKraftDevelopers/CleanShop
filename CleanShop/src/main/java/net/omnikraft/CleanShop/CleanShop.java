@@ -24,13 +24,18 @@ import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.block.Chest;
+import org.bukkit.block.DoubleChest;
 import org.bukkit.block.Sign;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.json.simple.JSONArray;
+import org.json.simple.JSONObject;
+import org.json.simple.parser.JSONParser;
 
 import com.sk89q.worldguard.bukkit.WGBukkit;
 import com.sk89q.worldguard.bukkit.WorldGuardPlugin;
@@ -44,10 +49,6 @@ public final class CleanShop extends JavaPlugin{
 		public Vector<NameToID> nameToIDs = new Vector<NameToID>();
 		int waitToCopyTimer=0;
 		int tickMethodID;
-		
-		//TODO: make stock signs only invalidate chests if they're actually attached to them
-		//TODO: make placing a sign with the stock keywords check if it's on a chest and recount stock if so
-		//TODO: double chests are weird if you put the sign on the wrong side
 
 		public File getShopFile()
 		{
@@ -127,27 +128,40 @@ public final class CleanShop extends JavaPlugin{
 	 	              new FileOutputStream(getTempShopFile()), "utf-8"))) {
 	 			if(!getTempShopFile().exists())
 	 				getTempShopFile().createNewFile();
+	 			
+	 			JSONObject obj=new JSONObject();
+ 				JSONArray shopObjs=new JSONArray();
 	 			for(Shop s:shops)
 	 			{
-	 				Location loc=s.getLocation();
-	 				String loca="";
-	 				if(loc!=null)
-	 					loca="LOCATION:"+loc.getWorld().getName() + ":" + loc.getX() + ":" + loc.getY() + ":" + loc.getZ()+
-	 					":"+ loc.getYaw()+":"+loc.getPitch()+ ";";
-	 				String items="";
-	 				if(s.getStock().size()>0)
-	 					items="ITEMS:";
-	 				for(int i=0;i<s.getStock().size();i++)
+	 				JSONObject shop=new JSONObject();
+	 				shop.put("name", s.getRegion().getId());
+	 				shop.put("world", s.getLocation().getWorld().getName());
+	 				shop.put("x", s.getLocation().getX());
+	 				shop.put("y", s.getLocation().getY());
+	 				shop.put("z", s.getLocation().getZ());
+	 				shop.put("pitch", s.getLocation().getPitch());
+	 				shop.put("yaw", s.getLocation().getYaw());
+	 				
+	 				JSONArray chestObjs=new JSONArray();
+	 				for(ChestData c:s.chestData)
 	 				{
-	 					items+=s.getStock().get(i).name();
-	 					if(i==s.getStock().size()-1)
-	 						items+=";";
-	 					else
-	 						items+=":";
+	 					System.out.println(c);
+	 					JSONObject chest=new JSONObject();
+	 					chest.put("x", c.x);
+	 					chest.put("y", c.y);
+	 					chest.put("z", c.z);
+		 				JSONArray mats=new JSONArray();
+		 				for(Material m:c.getItems())
+		 					mats.add(m.name());
+		 				chest.put("items", mats);
+		 				chestObjs.add(chest);
 	 				}
-	 				writer.write(s.getRegion().getId()+";"+loca+items);
-	 				((BufferedWriter) writer).newLine();
+	 				shop.put("chests", chestObjs);
+	 				shopObjs.add(shop);
 	 			}
+ 				obj.put("shops", shopObjs);
+	 			
+ 				writer.write(obj.toString());
 	 			tickMethodID = getServer().getScheduler().scheduleSyncDelayedTask(this, new Runnable() {
 		 		    public void run() {
 			 			copyFile(getTempShopFile(), getShopFile());
@@ -164,52 +178,48 @@ public final class CleanShop extends JavaPlugin{
 	 		if(!getShopFile().exists())
 	 			return;
 	 		String line;
+	 		String all="";
 	 		try (
 	 		    InputStream fis = new FileInputStream(getShopFile());
 	 		    InputStreamReader isr = new InputStreamReader(fis, Charset.forName("UTF-8"));
 	 		    BufferedReader br = new BufferedReader(isr);
 	 		) { while ((line = br.readLine()) != null) {
-	 		        String[] all = line.split(";");
-	 		        String SHOP_NAME=all[0];
-	 		        Location LOCATION=null;
-	 		        Vector<Material> ITEMS=null;
-	 		        //Name, location, items
- 		        	World w=Bukkit.getWorld("world");
-	 		        for(String s:all)
-	 		        {
-	 		        	if(!s.equals(all[0]))
-	 		        	{
-	 		        		if(s.startsWith("LOCATION:"))
-		 		        	{
-	 		        			String[] args = s.split(":");
-	 		        			World world = Bukkit.getWorld(args[1]);
-	 		        			w=world;
-		 		        		LOCATION=new Location(world,Double.parseDouble(args[2]),Double.parseDouble(args[3]),Double.parseDouble(args[4]),
-		 		        				Float.parseFloat(args[5]),Float.parseFloat(args[6]));
-		 		        	}
-		 		        	else if(s.startsWith("ITEMS:"))
-		 		        	{
-	 		        			String[] args = s.split(":");
-	 		        			ITEMS = new Vector<Material>();
-	 		        			for(String a:args)
-	 		        			{
-	 		        				if(a!=args[0])
-	 		        				{
-		 		        				ITEMS.add(matchMaterial(a));
-	 		        				}
-	 		        			}
-		 		        	}
-	 		        	}
-	 		        }
-	 		        if(worldGuard.getRegionManager(w)==null) continue;
-	 		        ProtectedRegion region=worldGuard.getRegionManager(w).getRegion(SHOP_NAME);
-	 		        this.createShop(region);
-	 		        Shop s=getShop(region);
-	 		        if(LOCATION!=null)
-	 		        	s.setLocation(LOCATION);
-	 		        if(ITEMS!=null)
-		 		        s.setStock(ITEMS);
+	 		        all+=line;
 	 		    }
+	 		 JSONParser parser=new JSONParser();
+	 		 JSONObject obj=(JSONObject)parser.parse(all);
+	 		 JSONArray shops = (JSONArray)obj.get("shops");
+	 		 for(int i=0;i<shops.size();i++)
+	 		 {
+	 			 JSONObject shop=(JSONObject)shops.get(i);
+		         World w=Bukkit.getWorld("world");
+		         System.out.println("-------- "+(String)shop.get("name"));
+		         ProtectedRegion region=worldGuard.getRegionManager(w).getRegion((String)shop.get("name"));
+			     this.createShop(region);
+			     Shop s=getShop(region);
+			     
+			     s.setLocation(new Location(w,
+			    		 (double)shop.get("x"),
+			    		 (double)shop.get("y"),
+			    		 (double)shop.get("z"),
+			    		 (float)Double.parseDouble(shop.get("yaw").toString())
+			    		 ,(float)Double.parseDouble(shop.get("pitch").toString())));
+			     
+			     JSONArray chests=(JSONArray)shop.get("chests");
+			     for(int j=0;j<chests.size();j++)
+			     {
+			    	 JSONObject chest=(JSONObject)chests.get(i);
+			    	 ChestData c=new ChestData((int)chest.get("x"),(int)chest.get("y"),(int)chest.get("z"),null);
+			    	 JSONArray mats=(JSONArray)chest.get("items");
+			    	 Material[] materials=new Material[mats.size()];
+			    	 for(int k=0;k<mats.size();k++)
+			    	 {
+			    		 materials[i]=Material.getMaterial((String)mats.get(i));
+			    	 }
+			    	 c.setItems(materials);
+			    	 s.chestData.add(c);
+			     }
+	 		 }
 	 		} catch (Exception e) {
 				e.printStackTrace();
 			}
@@ -360,10 +370,60 @@ public final class CleanShop extends JavaPlugin{
 			}
 			return ss;
 	    }
+	    public void calculateChestStock(Chest c,Shop s)
+	    {
+	    	ChestData data=s.getChestAt(c.getX(), c.getY(), c.getZ());
+	    	if(data==null)
+	    	{
+	    		data=new ChestData(c.getX(), c.getY(), c.getZ(),null);
+	    		s.chestData.add(data);
+	    	}
+
+	         invContents(c.getBlockInventory(),data);
+	         System.out.println("Single chest");
+	    }
+	    public void calculateChestStock(DoubleChest c,Shop s)
+	    {
+	    	ChestData data=s.getChestAt((int)c.getX(), (int)c.getY(), (int)c.getZ());
+	    	if(data==null)
+	    	{
+	    		data=new ChestData((int)c.getX(), (int)c.getY(), (int)c.getZ(),null);
+	    		s.chestData.add(data);
+	    	}
+
+	         invContents(c.getInventory(),data);
+	         System.out.println("Double chest");
+	    }
+	    
+	    public void invContents(Inventory blockInv,ChestData data)
+	    {
+	    	Vector<Material> stock = new Vector<Material>();
+	    	for(ItemStack i:blockInv.getContents())
+            {
+	           	 if(i!=null&&i.getType()!=null)
+	           	 {
+	           		 //Add every item that isn't named or a diamond.
+	               	 if(!stock.contains(i.getType())&&
+	               			 i.getItemMeta().getDisplayName()==null&&
+	               			 i.getType()!=Material.DIAMOND)
+	               	 {
+	               		 stock.add(i.getType());
+	               		 System.out.println("Added "+i.getType());
+	               	 }
+	           	 }
+            }
+	    	Material[] dat=new Material[stock.size()];
+	    	for(int i=0;i<stock.size();i++)	
+	    	{
+	    		dat[i]=stock.get(i);
+	    	}
+	    	data.setItems(dat);
+	    }
 	    
 	    public void calculateShopStock(Shop s)
 	    {
-	    	
+	    	Vector<Chest> queuedChests =new Vector<Chest>();
+	    	Vector<Chest> checkedChests =new Vector<Chest>();
 	    	ProtectedRegion region=s.getRegion();
 	    	 int xMin = region.getMinimumPoint().getBlockX();
 	  
@@ -384,33 +444,67 @@ public final class CleanShop extends JavaPlugin{
 	                     Block loc= (Block) new Location(s.getLocation().getWorld(), xMin, yMin, zMin).getBlock();
 	                    // System.out.println("("+xMin+", "+yMin+", "+zMin+"): "+loc.getType());
 	                     
-	                     //If it's a chest, make sure it doesn't have a "this is stock"-type sign on it
 	                     if(loc.getType()==Material.CHEST)
 	                     {
 	                    	 Chest sc = (Chest) loc.getState();
-	                    	 if(!isStockChest(sc))
-	                    	 {
-		                         for(ItemStack i:sc.getBlockInventory().getContents())
-		                         {
-		                        	 if(i!=null&&i.getType()!=null)
-		                        	 {
-		                        		 //Add every item that isn't named or a diamond.
-			                        	 if(!stock.contains(i.getType())&&
-			                        			 i.getItemMeta().getDisplayName()==null&&
-			                        			 i.getType()!=Material.DIAMOND)
-			                        	 {
-			                        		 stock.add(i.getType());
-			                        		 System.out.println("Added "+i.getType());
-			                        	 }
-		                        	 }
-		                         }
-	                    	 }
+	                    	 queuedChests.add(sc);
 	                     }
 	                 }
 	             }
 	         }
+             //Make sure chests don't have a "this is stock"-type sign on it
+	         for(Chest c:queuedChests)
+	         {
+	        	 if(!checkedChests.contains(c))
+	        	 {
+		        	 boolean isDouble=c.getInventory().getSize()==54;
+		        	 
+		        	 if(!isStockChest(c))
+	            	 {
+	                     for(ItemStack i:c.getBlockInventory().getContents())
+	                     {
+	                    	 if(i!=null&&i.getType()!=null)
+	                    	 {
+	                    		 //Add every item that isn't named or a diamond.
+	                        	 if(!stock.contains(i.getType())&&
+	                        			 i.getItemMeta().getDisplayName()==null&&
+	                        			 i.getType()!=Material.DIAMOND)
+	                        	 {
+	                        		 stock.add(i.getType());
+	                        		 System.out.println("Added "+i.getType());
+	                        	 }
+	                    	 }
+	                     }
+	            	 }
+		        	 else if(isDouble)
+		        	 {
+		        		 Chest otherHalf=findOtherDoubleHalf(c);
+		        		 if(otherHalf!=null)
+		        		 {
+				        	 checkedChests.add(otherHalf);
+		        		 }
+		        		 else
+		        			 System.out.println("AAAAAHHHHH CAN'T FIND OTHER HALF OF DOUBLE CHEST");
+		        	 }
+		        	 checkedChests.add(c);
+	        	 }
+	         }
 	         s.setStock(stock);
 	         saveShops();
+	    }
+	    
+	    private Chest findOtherDoubleHalf(Chest c)
+	    {
+	    	Location[] loc=new Location[]{
+	    			c.getLocation().clone().add(1, 0, 0),
+	    			c.getLocation().clone().add(-1, 0, 0),
+	    			c.getLocation().clone().add(0, 0, 1),
+	    			c.getLocation().clone().add(0, 0, -1)
+	    	};
+	    	for(Location loc1:loc)
+	    		if(loc1.getBlock().getType()==Material.CHEST)
+	    			return (Chest)loc1.getBlock().getState();
+	    	return null;
 	    }
 	    
 	    /**
@@ -425,6 +519,7 @@ public final class CleanShop extends JavaPlugin{
 	    			sc.getLocation().clone().add(0, 0, 1),
 	    			sc.getLocation().clone().add(0, 0, -1)
 	    	};
+	    	
 	    	for(Location loc1:loc)
 		    	if(loc1.getBlock().getState() instanceof Sign&&loc1.getBlock().getType()==Material.WALL_SIGN)
 		    	{
@@ -470,7 +565,7 @@ public final class CleanShop extends JavaPlugin{
 	    						createShop(region);
 	    						sender.sendMessage("A shop has been added to region: "+region.getId());
 	    						sender.sendMessage(ChatColor.YELLOW+"Please note that you should set the location of the shop via /setshopteleport (or /sst) before the server is closed!");
-	    			    		saveShops();
+	    			    		//saveShops();
 	    					}
 	    					else
 	    						sender.sendMessage(ChatColor.RED+"A shop already exists here!");

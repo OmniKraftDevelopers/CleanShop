@@ -12,19 +12,31 @@ public class Shop {
 	private ProtectedRegion region;
 	private Location location;
 	private Vector<Material> stock=new Vector<Material>();
+	Vector<ChestData> chestData = new Vector<ChestData>();
 	
 	public Vector<Material> getStock()
 	{
 		return stock;
 	}
 	
+	public ChestData getChestAt(int x, int y, int z)
+	{
+		for(ChestData c:chestData)
+		{
+			if(c.x==x&&c.y==y&&c.z==z)
+				return c;
+		}
+		return null;
+	}
+	
 	public boolean hasItem(Material m)
 	{
-		for(Material i: stock)
-		{
-			if(i==m)
-				return true;
-		}
+		for(ChestData c:chestData)
+			for(Material i: c.getItems())
+			{
+				if(i==m)
+					return true;
+			}
 		return false;
 	}
 	

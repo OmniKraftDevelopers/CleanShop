@@ -4,7 +4,7 @@ import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.net.URL;
 
-public class JSONParser {
+public class ReadURL {
 	
 	public static String readUrl(String urlString) throws Exception {
 	    BufferedReader reader = null;

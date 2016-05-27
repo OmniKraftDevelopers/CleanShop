@@ -22,6 +22,7 @@ public class EventListener implements Listener{
 
 	@EventHandler
 	public void onInventoryCloseEvent(InventoryCloseEvent event) {
+		long time=System.nanoTime();
 		if(event.getInventory().getType()==InventoryType.CHEST)
 		{
 			System.out.println("--------");
@@ -34,10 +35,17 @@ public class EventListener implements Listener{
 			{
 				if(plugin.shopExists(p))
 				{
-					plugin.calculateShopStock(plugin.getShop(p));
+					System.out.println("VOLUME: "+((p.getMaximumPoint().getX()-p.getMinimumPoint().getX())*(p.getMaximumPoint().getY()-p.getMinimumPoint().getY())*(p.getMaximumPoint().getZ()-p.getMinimumPoint().getZ())));
+					//plugin.calculateShopStock(plugin.getShop(p));
+					if(event.getInventory().getHolder() instanceof Chest)
+						plugin.calculateChestStock((Chest)event.getInventory().getHolder(), plugin.getShop(p));
+					else
+						plugin.calculateChestStock((DoubleChest)event.getInventory().getHolder(), plugin.getShop(p));
+					plugin.saveShops();
 				}
 			}
 		}
+		System.out.println("Took "+(System.nanoTime()-time)+" nanoseconds");
 	}
 
 }

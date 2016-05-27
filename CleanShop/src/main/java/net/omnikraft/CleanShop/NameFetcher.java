@@ -16,7 +16,7 @@ public class NameFetcher {
 public static String getNameByUUID(String uuid) {
        
         try {
-            String j=JSONParser.readUrl("https://api.mojang.com/user/profiles/UUID/names".replace("UUID", uuid.replace("-", "")));
+            String j=ReadURL.readUrl("https://api.mojang.com/user/profiles/UUID/names".replace("UUID", uuid.replace("-", "")));
            // System.out.println("NAME BY UUID "+j);
             JSONArray o=new JSONArray(j);
 			String name=o.getJSONObject(o.length()-1).getString("name");
@@ -32,7 +32,7 @@ public static String getNameByUUID(String uuid) {
 public static UUID getUUIDByName(String name) {
     
     try {
-        String j=JSONParser.readUrl("https://api.mojang.com/users/profiles/minecraft/UUID".replace("UUID", name));
+        String j=ReadURL.readUrl("https://api.mojang.com/users/profiles/minecraft/UUID".replace("UUID", name));
         //System.out.println("UUID BY NAME "+j);
         JSONObject o=new JSONObject(j);
 		String id=o.getString("id");
