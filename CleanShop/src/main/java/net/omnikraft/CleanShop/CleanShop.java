@@ -49,14 +49,15 @@ public final class CleanShop extends JavaPlugin{
 		public Vector<NameToID> nameToIDs = new Vector<NameToID>();
 		int waitToCopyTimer=0;
 		int tickMethodID;
+		public boolean shopScan=true;
 
 		public File getShopFile()
 		{
-			return new File(getDataFolder().getAbsolutePath(),"shops.data");
+			return new File(getDataFolder().getAbsolutePath(),"shops.json");
 		}
 		public File getTempShopFile()
 		{
-			return new File(getDataFolder().getAbsolutePath(),"shops_temp.data");
+			return new File(getDataFolder().getAbsolutePath(),"shops_temp.json");
 		}
 		
 		public void copyFile(File inputFile, File outputFile)
@@ -124,6 +125,7 @@ public final class CleanShop extends JavaPlugin{
 	 	
 		public void saveShops()
 	 	{
+			//System.out.println("saving");
 	 		try (Writer writer = new BufferedWriter(new OutputStreamWriter(
 	 	              new FileOutputStream(getTempShopFile()), "utf-8"))) {
 	 			if(!getTempShopFile().exists())
@@ -145,14 +147,15 @@ public final class CleanShop extends JavaPlugin{
 	 				JSONArray chestObjs=new JSONArray();
 	 				for(ChestData c:s.chestData)
 	 				{
-	 					System.out.println(c);
+	 					//System.out.println(c);
 	 					JSONObject chest=new JSONObject();
-	 					chest.put("x", c.x);
-	 					chest.put("y", c.y);
-	 					chest.put("z", c.z);
+	 					chest.put("x", (int)c.x);
+	 					chest.put("y", (int)c.y);
+	 					chest.put("z", (int)c.z);
 		 				JSONArray mats=new JSONArray();
 		 				for(Material m:c.getItems())
-		 					mats.add(m.name());
+		 					if(m!=null)
+		 						mats.add(m.name());
 		 				chest.put("items", mats);
 		 				chestObjs.add(chest);
 	 				}
@@ -160,6 +163,7 @@ public final class CleanShop extends JavaPlugin{
 	 				shopObjs.add(shop);
 	 			}
  				obj.put("shops", shopObjs);
+ 				obj.put("shopScan", shopScan);
 	 			
  				writer.write(obj.toString());
 	 			tickMethodID = getServer().getScheduler().scheduleSyncDelayedTask(this, new Runnable() {
@@ -188,12 +192,13 @@ public final class CleanShop extends JavaPlugin{
 	 		    }
 	 		 JSONParser parser=new JSONParser();
 	 		 JSONObject obj=(JSONObject)parser.parse(all);
+	 		 shopScan=((boolean)obj.get("shopScan"));
 	 		 JSONArray shops = (JSONArray)obj.get("shops");
 	 		 for(int i=0;i<shops.size();i++)
 	 		 {
 	 			 JSONObject shop=(JSONObject)shops.get(i);
 		         World w=Bukkit.getWorld("world");
-		         System.out.println("-------- "+(String)shop.get("name"));
+		         //System.out.println("-------- "+(String)shop.get("name"));
 		         ProtectedRegion region=worldGuard.getRegionManager(w).getRegion((String)shop.get("name"));
 			     this.createShop(region);
 			     Shop s=getShop(region);
@@ -209,7 +214,7 @@ public final class CleanShop extends JavaPlugin{
 			     for(int j=0;j<chests.size();j++)
 			     {
 			    	 JSONObject chest=(JSONObject)chests.get(i);
-			    	 ChestData c=new ChestData((int)chest.get("x"),(int)chest.get("y"),(int)chest.get("z"),null);
+			    	 ChestData c=new ChestData(Math.toIntExact((long)chest.get("x")),Math.toIntExact((long)chest.get("y")),Math.toIntExact((long)chest.get("z")),null);
 			    	 JSONArray mats=(JSONArray)chest.get("items");
 			    	 Material[] materials=new Material[mats.size()];
 			    	 for(int k=0;k<mats.size();k++)
@@ -380,7 +385,7 @@ public final class CleanShop extends JavaPlugin{
 	    	}
 
 	         invContents(c.getBlockInventory(),data);
-	         System.out.println("Single chest");
+	         //System.out.println("Single chest");
 	    }
 	    public void calculateChestStock(DoubleChest c,Shop s)
 	    {
@@ -392,7 +397,7 @@ public final class CleanShop extends JavaPlugin{
 	    	}
 
 	         invContents(c.getInventory(),data);
-	         System.out.println("Double chest");
+	        // System.out.println("Double chest");
 	    }
 	    
 	    public void invContents(Inventory blockInv,ChestData data)
@@ -408,7 +413,7 @@ public final class CleanShop extends JavaPlugin{
 	               			 i.getType()!=Material.DIAMOND)
 	               	 {
 	               		 stock.add(i.getType());
-	               		 System.out.println("Added "+i.getType());
+	               		 //System.out.println("Added "+i.getType());
 	               	 }
 	           	 }
             }
@@ -471,7 +476,7 @@ public final class CleanShop extends JavaPlugin{
 	                        			 i.getType()!=Material.DIAMOND)
 	                        	 {
 	                        		 stock.add(i.getType());
-	                        		 System.out.println("Added "+i.getType());
+	                        		// System.out.println("Added "+i.getType());
 	                        	 }
 	                    	 }
 	                     }
@@ -483,8 +488,6 @@ public final class CleanShop extends JavaPlugin{
 		        		 {
 				        	 checkedChests.add(otherHalf);
 		        		 }
-		        		 else
-		        			 System.out.println("AAAAAHHHHH CAN'T FIND OTHER HALF OF DOUBLE CHEST");
 		        	 }
 		        	 checkedChests.add(c);
 	        	 }
@@ -827,6 +830,30 @@ public final class CleanShop extends JavaPlugin{
 	    			}
     				return true;
 	    		}
+	    		return false;
+	    	}
+	    	else if (cmd.getName().equalsIgnoreCase("setshopscan")) {
+	    		if(args.length==1)
+	    		{
+	    			if(args[0].toLowerCase().equals("true"))
+	    			{
+	    				this.shopScan=true;
+	    				sender.sendMessage(ChatColor.GREEN+"Enabled shop scanning.");
+	    			}
+	    			else if(args[0].toLowerCase().equals("false"))
+	    			{
+	    				shopScan=false;
+	    				sender.sendMessage(ChatColor.GREEN+"Disabled shop scanning.");
+	    			}
+	    			else
+	    			{
+	    				sender.sendMessage(ChatColor.RED+"Argument must be true or false.");
+	    				return false;
+	    			}
+    				return true;
+	    		}
+	    		else if(args.length==0)
+	    			sender.sendMessage(ChatColor.GOLD+"Shop scanning is currently "+(shopScan?"enabled.":"disabled."));
 	    		return false;
 	    	}
 	    	else if (cmd.getName().equalsIgnoreCase("tpshop")) {
