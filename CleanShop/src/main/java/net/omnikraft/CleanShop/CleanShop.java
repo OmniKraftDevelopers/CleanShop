@@ -22,10 +22,9 @@ import org.bukkit.ChatColor;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.World;
-import org.bukkit.block.Block;
+import org.bukkit.block.BlockFace;
 import org.bukkit.block.Chest;
 import org.bukkit.block.DoubleChest;
-import org.bukkit.block.Sign;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
@@ -53,11 +52,11 @@ public final class CleanShop extends JavaPlugin{
 
 		public File getShopFile()
 		{
-			return new File(getDataFolder().getAbsolutePath(),"shops.json");
+			return new File(getDataFolder().getAbsolutePath(),"shops.data");
 		}
 		public File getTempShopFile()
 		{
-			return new File(getDataFolder().getAbsolutePath(),"shops_temp.json");
+			return new File(getDataFolder().getAbsolutePath(),"shops_temp.data");
 		}
 		
 		public void copyFile(File inputFile, File outputFile)
@@ -213,13 +212,13 @@ public final class CleanShop extends JavaPlugin{
 			     JSONArray chests=(JSONArray)shop.get("chests");
 			     for(int j=0;j<chests.size();j++)
 			     {
-			    	 JSONObject chest=(JSONObject)chests.get(i);
+			    	 JSONObject chest=(JSONObject)chests.get(j);
 			    	 ChestData c=new ChestData(Math.toIntExact((long)chest.get("x")),Math.toIntExact((long)chest.get("y")),Math.toIntExact((long)chest.get("z")),null);
 			    	 JSONArray mats=(JSONArray)chest.get("items");
 			    	 Material[] materials=new Material[mats.size()];
 			    	 for(int k=0;k<mats.size();k++)
 			    	 {
-			    		 materials[i]=Material.getMaterial((String)mats.get(i));
+			    		 materials[k]=Material.getMaterial((String)mats.get(k));
 			    	 }
 			    	 c.setItems(materials);
 			    	 s.chestData.add(c);
@@ -375,6 +374,56 @@ public final class CleanShop extends JavaPlugin{
 			}
 			return ss;
 	    }
+	    
+	    public void clearSingleChest(Chest c, Shop s)
+	    {
+	    	ChestData rm=null;
+			for(ChestData cd:s.chestData)
+				if(cd.x==c.getX()&&cd.y==c.getY()&&cd.z==c.getZ())
+				{
+					rm=cd;
+					break;
+				}
+			if(rm!=null)
+				s.chestData.remove(rm);
+	    }
+	    
+	    //uuuuuuuuugggggggggggghhhhhhhhhhhhhhhh
+	    public void dealWithThisFreakingDoubleChest(Chest c, Shop s, BlockFace side)
+	    {
+	    	ChestData rm=null;
+			for(ChestData cd:s.chestData)
+				if(cd.x==c.getX()&&cd.y==c.getY()&&cd.z==c.getZ())
+				{
+					rm=cd;
+					break;
+				}
+			if(rm!=null)
+				s.chestData.remove(rm);
+			
+			rm=null;
+			int x=(int) c.getX();
+			int z=(int) c.getZ();
+			if(side==BlockFace.NORTH)
+				z--;
+			else if(side==BlockFace.SOUTH)
+				z++;
+			else if(side==BlockFace.EAST)
+				x++;
+			else if(side==BlockFace.WEST)
+				x--;
+			for(ChestData cd:s.chestData)
+				if(cd.x==x&&cd.y==c.getY()&&cd.z==z)
+				{
+					rm=cd;
+					break;
+				}
+			if(rm!=null)
+				s.chestData.remove(rm);
+			
+			calculateChestStock((Chest)c.getWorld().getBlockAt(x, c.getY(), z).getState(),s);
+	    }
+	    
 	    public void calculateChestStock(Chest c,Shop s)
 	    {
 	    	ChestData data=s.getChestAt(c.getX(), c.getY(), c.getZ());
@@ -424,120 +473,6 @@ public final class CleanShop extends JavaPlugin{
 	    	}
 	    	data.setItems(dat);
 	    }
-	    
-	    public void calculateShopStock(Shop s)
-	    {
-	    	Vector<Chest> queuedChests =new Vector<Chest>();
-	    	Vector<Chest> checkedChests =new Vector<Chest>();
-	    	ProtectedRegion region=s.getRegion();
-	    	 int xMin = region.getMinimumPoint().getBlockX();
-	  
-	         int xMax = region.getMaximumPoint().getBlockX();
-	         int yMax = region.getMaximumPoint().getBlockY();
-	         int zMax = region.getMaximumPoint().getBlockZ();
-	         
-	         Vector<Material> stock = new Vector<Material>();
-	         //Iterate through every block in the shop's region
-	         for(;xMin<=xMax;xMin++)
-	         {
-		         int yMin = region.getMinimumPoint().getBlockY();
-	             for(;yMin<=yMax;yMin++)
-	             {
-	    	         int zMin = region.getMinimumPoint().getBlockZ();
-	                 for(;zMin<=zMax;zMin++)
-	                 {
-	                     Block loc= (Block) new Location(s.getLocation().getWorld(), xMin, yMin, zMin).getBlock();
-	                    // System.out.println("("+xMin+", "+yMin+", "+zMin+"): "+loc.getType());
-	                     
-	                     if(loc.getType()==Material.CHEST)
-	                     {
-	                    	 Chest sc = (Chest) loc.getState();
-	                    	 queuedChests.add(sc);
-	                     }
-	                 }
-	             }
-	         }
-             //Make sure chests don't have a "this is stock"-type sign on it
-	         for(Chest c:queuedChests)
-	         {
-	        	 if(!checkedChests.contains(c))
-	        	 {
-		        	 boolean isDouble=c.getInventory().getSize()==54;
-		        	 
-		        	 if(!isStockChest(c))
-	            	 {
-	                     for(ItemStack i:c.getBlockInventory().getContents())
-	                     {
-	                    	 if(i!=null&&i.getType()!=null)
-	                    	 {
-	                    		 //Add every item that isn't named or a diamond.
-	                        	 if(!stock.contains(i.getType())&&
-	                        			 i.getItemMeta().getDisplayName()==null&&
-	                        			 i.getType()!=Material.DIAMOND)
-	                        	 {
-	                        		 stock.add(i.getType());
-	                        		// System.out.println("Added "+i.getType());
-	                        	 }
-	                    	 }
-	                     }
-	            	 }
-		        	 else if(isDouble)
-		        	 {
-		        		 Chest otherHalf=findOtherDoubleHalf(c);
-		        		 if(otherHalf!=null)
-		        		 {
-				        	 checkedChests.add(otherHalf);
-		        		 }
-		        	 }
-		        	 checkedChests.add(c);
-	        	 }
-	         }
-	         s.setStock(stock);
-	         saveShops();
-	    }
-	    
-	    private Chest findOtherDoubleHalf(Chest c)
-	    {
-	    	Location[] loc=new Location[]{
-	    			c.getLocation().clone().add(1, 0, 0),
-	    			c.getLocation().clone().add(-1, 0, 0),
-	    			c.getLocation().clone().add(0, 0, 1),
-	    			c.getLocation().clone().add(0, 0, -1)
-	    	};
-	    	for(Location loc1:loc)
-	    		if(loc1.getBlock().getType()==Material.CHEST)
-	    			return (Chest)loc1.getBlock().getState();
-	    	return null;
-	    }
-	    
-	    /**
-	     * @param sc - Chest
-	     * @return If any signs attached to the chest say things like "stock"/"supplies"
-	     */
-	    private boolean isStockChest(Chest sc) {
-	    	Vector<Sign> signs = new Vector<Sign>();
-	    	Location[] loc=new Location[]{
-	    			sc.getLocation().clone().add(1, 0, 0),
-	    			sc.getLocation().clone().add(-1, 0, 0),
-	    			sc.getLocation().clone().add(0, 0, 1),
-	    			sc.getLocation().clone().add(0, 0, -1)
-	    	};
-	    	
-	    	for(Location loc1:loc)
-		    	if(loc1.getBlock().getState() instanceof Sign&&loc1.getBlock().getType()==Material.WALL_SIGN)
-		    	{
-		    		signs.add((Sign)loc1.getBlock().getState());
-		    	}
-	    	for(Sign s:signs)
-	    	{
-	    		for(String ss:s.getLines())
-	    		{
-	    			if(ss.toLowerCase().contains("stock")||ss.toLowerCase().contains("supply")||ss.toLowerCase().contains("supplies"))
-	    				return true;
-	    		}
-	    	}
-			return false;
-		}
 	    
 		public boolean onCommand(CommandSender sender, Command cmd, String label, String[] args) {
 	    	try{
@@ -676,7 +611,7 @@ public final class CleanShop extends JavaPlugin{
 					else
 					{
 						Vector<Shop> theShops = this.getShopsWithItem((Player)sender,args[0]);
-						sender.sendMessage("Shops that have "+args[0]+": ");
+						sender.sendMessage("Shops that have "+ChatColor.BLUE+args[0]+ChatColor.WHITE+": ");
 						String msg="";
 						for(Shop s:theShops)
 						{
@@ -711,7 +646,7 @@ public final class CleanShop extends JavaPlugin{
 
 			    				if(owner.size()>2&&ss.equals(owner.get(owner.size()-2)))
 			    					owners+=ChatColor.WHITE+", and ";
-			    				else
+			    				else if(!owner.lastElement().equals(ss))
 			    					owners+=ChatColor.WHITE+", ";
 			    			}
 			    			msg+=ChatColor.WHITE+"Shop "+ChatColor.GREEN+s.getRegion().getId()+ChatColor.WHITE+", owned by "+owners+ChatColor.WHITE;
@@ -850,11 +785,19 @@ public final class CleanShop extends JavaPlugin{
 	    				sender.sendMessage(ChatColor.RED+"Argument must be true or false.");
 	    				return false;
 	    			}
+    				saveShops();
     				return true;
 	    		}
 	    		else if(args.length==0)
 	    			sender.sendMessage(ChatColor.GOLD+"Shop scanning is currently "+(shopScan?"enabled.":"disabled."));
 	    		return false;
+	    	}else if (cmd.getName().equalsIgnoreCase("wipestock"))
+	    	{
+	    		for(Shop s:this.shops)
+	    			s.chestData.clear();
+	    		sender.sendMessage(ChatColor.GREEN+"All shop stocks have been wiped. Re-opening chests will refresh stock.");
+				saveShops();
+	    		return true;
 	    	}
 	    	else if (cmd.getName().equalsIgnoreCase("tpshop")) {
 	    		if(sender instanceof Player)

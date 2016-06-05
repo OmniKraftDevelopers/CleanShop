@@ -16,6 +16,11 @@ commands:
       usage: /setshopscan [true:false]
       permission: cleanshop.setshopscan
       permission-message: You don't have permission!
+   wipestock:
+      description: Deletes the stock for all shops.
+      usage: /wipestock
+      permission: cleanshop.wipestock
+      permission-message: You don't have permission!
    removeshop:
       description: Removes the given shop
       usage: /removeShop <region>
