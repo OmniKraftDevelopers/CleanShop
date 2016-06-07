@@ -18,11 +18,11 @@ public static String getNameByUUID(String uuid) {
         try {
             String j=ReadURL.readUrl("https://api.mojang.com/user/profiles/UUID/names".replace("UUID", uuid.replace("-", "")));
            // System.out.println("NAME BY UUID "+j);
-            JSONArray o=new JSONArray(j);
+            try{JSONArray o=new JSONArray(j);
 			String name=o.getJSONObject(o.length()-1).getString("name");
 			//if(name==null||name.equals(""))
 				//System.out.println("HE DOESN'T EXIST. "+uuid);
-            return name;
+            return name;}catch(Exception e){}
         } catch (Exception e) {
             e.printStackTrace();
         }

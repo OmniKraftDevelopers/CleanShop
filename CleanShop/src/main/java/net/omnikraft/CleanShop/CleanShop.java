@@ -13,9 +13,11 @@ import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.nio.charset.Charset;
+import java.util.Collections;
 import java.util.Set;
 import java.util.UUID;
 import java.util.Vector;
+import java.util.logging.Level;
 
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
@@ -36,6 +38,7 @@ import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 
+import com.sk89q.worldedit.BlockVector;
 import com.sk89q.worldguard.bukkit.WGBukkit;
 import com.sk89q.worldguard.bukkit.WorldGuardPlugin;
 import com.sk89q.worldguard.protection.ApplicableRegionSet;
@@ -136,12 +139,31 @@ public final class CleanShop extends JavaPlugin{
 	 			{
 	 				JSONObject shop=new JSONObject();
 	 				shop.put("name", s.getRegion().getId());
-	 				shop.put("world", s.getLocation().getWorld().getName());
-	 				shop.put("x", s.getLocation().getX());
-	 				shop.put("y", s.getLocation().getY());
-	 				shop.put("z", s.getLocation().getZ());
-	 				shop.put("pitch", s.getLocation().getPitch());
-	 				shop.put("yaw", s.getLocation().getYaw());
+	 				try{
+		 				shop.put("world", s.getLocation().getWorld().getName());
+		 				shop.put("x", (double)s.getLocation().getX());
+		 				shop.put("y", (double)s.getLocation().getY());
+		 				shop.put("z", (double)s.getLocation().getZ());
+		 				shop.put("pitch", (double)s.getLocation().getPitch());
+		 				shop.put("yaw", (double)s.getLocation().getYaw());
+	 				}
+	 				catch(NullPointerException e)
+	 				{
+	 					Bukkit.getLogger().log(Level.WARNING,"Shop "+s.getRegion().getId()+" doesn't have a tp location set. I'm setting it to the midpoint of the region for now.");
+	 					BlockVector max=s.getRegion().getMaximumPoint();
+	 					BlockVector min=s.getRegion().getMinimumPoint();
+		 				shop.put("world", "world");
+		 				shop.put("x", (double)(max.getBlockX()+min.getBlockX())/2d);
+		 				shop.put("y", (double)(max.getBlockY()+min.getBlockY())/2d);
+		 				shop.put("z", (double)(max.getBlockZ()+min.getBlockZ())/2d);
+		 				shop.put("pitch", 0.0);
+		 				shop.put("yaw", 0.0);
+	 				}
+	 				catch(Exception e)
+	 				{
+	 					System.out.println("Oh crap. Bad things happened.");
+	 					e.printStackTrace();
+	 				}
 	 				
 	 				JSONArray chestObjs=new JSONArray();
 	 				for(ChestData c:s.chestData)
@@ -186,7 +208,9 @@ public final class CleanShop extends JavaPlugin{
 	 		    InputStream fis = new FileInputStream(getShopFile());
 	 		    InputStreamReader isr = new InputStreamReader(fis, Charset.forName("UTF-8"));
 	 		    BufferedReader br = new BufferedReader(isr);
-	 		) { while ((line = br.readLine()) != null) {
+	 		)
+	 		{
+	 			while ((line = br.readLine()) != null) {
 	 		        all+=line;
 	 		    }
 	 		 JSONParser parser=new JSONParser();
@@ -201,13 +225,42 @@ public final class CleanShop extends JavaPlugin{
 		         ProtectedRegion region=worldGuard.getRegionManager(w).getRegion((String)shop.get("name"));
 			     this.createShop(region);
 			     Shop s=getShop(region);
-			     
-			     s.setLocation(new Location(w,
-			    		 (double)shop.get("x"),
-			    		 (double)shop.get("y"),
-			    		 (double)shop.get("z"),
-			    		 (float)Double.parseDouble(shop.get("yaw").toString())
-			    		 ,(float)Double.parseDouble(shop.get("pitch").toString())));
+
+			     //This is where it gets ugly.
+			     {
+			    	 double x=0;
+			    	 double y=0;
+			    	 double z=0;
+			    	 float yaw=0;
+			    	 float pitch=0;
+			    	 
+				     if(shop.get("x") instanceof Double)
+				    	 x=(double)shop.get("x");
+				     else
+				    	 x=Integer.parseInt(shop.get("x").toString());
+			    	 
+				     if(shop.get("y") instanceof Double)
+				    	 y=(double)shop.get("y");
+				     else
+				    	 y=Integer.parseInt(shop.get("y").toString());
+			    	 
+				     if(shop.get("z") instanceof Double)
+				    	 z=(double)shop.get("z");
+				     else
+				    	 z=Integer.parseInt(shop.get("z").toString());
+			    	 
+				     if(shop.get("yaw") instanceof Double)
+				    	 yaw=(float)(double)shop.get("yaw");
+				     else
+				    	 yaw=Integer.parseInt(shop.get("yaw").toString());
+			    	 
+				     if(shop.get("pitch") instanceof Double)
+				    	 pitch=(float)(double)shop.get("pitch");
+				     else
+				    	 pitch=Integer.parseInt(shop.get("pitch").toString());
+				     
+				     s.setLocation(new Location(w,x,y,z,yaw,pitch));
+			     }
 			     
 			     JSONArray chests=(JSONArray)shop.get("chests");
 			     for(int j=0;j<chests.size();j++)
@@ -225,6 +278,7 @@ public final class CleanShop extends JavaPlugin{
 			     }
 	 		 }
 	 		} catch (Exception e) {
+				System.err.println("There was an error loading the file.");
 				e.printStackTrace();
 			}
 	 	}
@@ -293,37 +347,6 @@ public final class CleanShop extends JavaPlugin{
 	    			return;
 	    	}
 	    	nameToIDs.add(new NameToID(id,name));
-	    }
-	    
-	    public boolean hasItemPermissions(Player player, Shop shop)
-	    {
-	    	return hasMember(player,shop)||hasOwner(player,shop);
-	    }
-	    
-	    public boolean hasMember(Player player,Shop shop)
-	    {
-	    	for(Shop s:shops)
-	    	{
-	    		if(shop.equals(s))
-		    		if(s.getRegion().getMembers().getUniqueIds().contains(player.getUniqueId()))
-		    		{
-		    			return true;
-		    		}
-	    	}
-	    	return false;
-	    }
-	    
-	    public boolean hasOwner(Player player,Shop shop)
-	    {
-	    	for(Shop s:shops)
-	    	{
-	    		if(shop.equals(s))
-		    		if(s.getRegion().getOwners().getUniqueIds().contains(player.getUniqueId()))
-		    		{
-		    			return true;
-		    		}
-	    	}
-	    	return false;
 	    }
 	    
 	    public void createShop(ProtectedRegion region)
@@ -486,7 +509,7 @@ public final class CleanShop extends JavaPlugin{
 		    			Set<ProtectedRegion> regions=ars.getRegions();
 		    			if(regions.size()==0)
 		    			{
-							sender.sendMessage(ChatColor.RED+"You need to be standing in a WorldGuard protected region to create a shop!");
+							sender.sendMessage(ChatColor.RED+"You need to be standing in a WorldGuard region to create a shop!");
 							return true;
 		    			}
 		    			else if(regions.size()>1)
@@ -502,8 +525,7 @@ public final class CleanShop extends JavaPlugin{
 	    					{
 	    						createShop(region);
 	    						sender.sendMessage("A shop has been added to region: "+region.getId());
-	    						sender.sendMessage(ChatColor.YELLOW+"Please note that you should set the location of the shop via /setshopteleport (or /sst) before the server is closed!");
-	    			    		//saveShops();
+	    			    		saveShops();
 	    					}
 	    					else
 	    						sender.sendMessage(ChatColor.RED+"A shop already exists here!");
@@ -612,7 +634,7 @@ public final class CleanShop extends JavaPlugin{
 					{
 						Vector<Shop> theShops = this.getShopsWithItem((Player)sender,args[0]);
 						sender.sendMessage("Shops that have "+ChatColor.BLUE+args[0]+ChatColor.WHITE+": ");
-						String msg="";
+						Vector<String> msgs=new Vector<String>();
 						for(Shop s:theShops)
 						{
 							Vector<String> owner=new Vector<String>();
@@ -649,10 +671,11 @@ public final class CleanShop extends JavaPlugin{
 			    				else if(!owner.lastElement().equals(ss))
 			    					owners+=ChatColor.WHITE+", ";
 			    			}
-			    			msg+=ChatColor.WHITE+"Shop "+ChatColor.GREEN+s.getRegion().getId()+ChatColor.WHITE+", owned by "+owners+ChatColor.WHITE;
-							sender.sendMessage(msg);
-							msg="";
+			    			msgs.add(ChatColor.WHITE+"Shop "+ChatColor.GREEN+s.getRegion().getId()+ChatColor.WHITE+", owned by "+owners+ChatColor.WHITE);
 						}
+						Collections.shuffle(msgs);
+						for(String s:msgs)
+							sender.sendMessage(s);
 					}
 	    		}
 	    		else{
@@ -664,68 +687,7 @@ public final class CleanShop extends JavaPlugin{
 	    	}
 	    	else if (cmd.getName().equalsIgnoreCase("setshopteleport")||cmd.getName().equalsIgnoreCase("sst")) {
 	    		if(sender instanceof Player)
-	    		{
-	    			if(args.length==0)
-	    			{
-		    			Player player = (Player)sender;
-		    			ApplicableRegionSet ars = getRegions(player.getLocation());
-		    			Set<ProtectedRegion> regions=ars.getRegions();
-		    			if(regions.size()==0)
-		    			{
-							sender.sendMessage(ChatColor.RED+"You need to be standing in a WorldGuard region to set the teleport! (Or you can use /setshopteleport [shop])");
-							return true;
-		    			}
-		    			else if(regions.size()>1)
-		    			{
-							sender.sendMessage("You are standing in multiple regions and I don't know which one to use for the shop! Use /setShopTeleport <regionName> instead.");
-							return true;
-		    			}
-		    			else
-		    			{
-		    				ProtectedRegion[] r = new ProtectedRegion[1];
-		    				ProtectedRegion region=regions.toArray(r)[0];
-		    				
-	    					Shop shop=this.getShop(region);
-	    					if(shop!=null)
-	    					{
-	    						setTeleport(shop,((Player) sender).getLocation());
-	    						sender.sendMessage("Set teleport for shop "+shop.getRegion().getId()+" to your location.");
-	    						saveShops();
-	    					}
-	    					else
-	    						sender.sendMessage(ChatColor.RED+"Couldn't find that shop!");
-	    					
-		    				return true;
-		    			}
-	    			}
-	    			else if(args.length==1)
-	    			{
-	    				ProtectedRegion region = worldGuard.getRegionManager(((Player) sender).getWorld()).getRegion(args[0]);
-	    				if(region==null)
-	    				{
-							sender.sendMessage(ChatColor.RED+"No regions could be found with name \""+args[0]+"\".");
-							return true;
-	    				}
-	    				else
-	    				{
-	    					if(shopExists(region))
-	    					{
-	    						Shop shop=this.getShop(region);
-		    					if(shop!=null)
-		    					{
-		    						setTeleport(shop,((Player) sender).getLocation());
-		    						sender.sendMessage("Set teleport for shop "+shop.getRegion().getId()+" to your location.");
-		    						saveShops();
-		    					}
-		    					else
-		    						sender.sendMessage(ChatColor.RED+"Couldn't find that shop!");
-	    					}
-	    					else
-	    						sender.sendMessage(ChatColor.RED+"No shop exists in region \""+args[0]+"\".");
-	    					return true;
-	    				}
-	    			}
-	    		}
+	    			return setShopTeleport((Player)sender,args);
 	    		saveShops();
 	    	}
 	    	else if (cmd.getName().equalsIgnoreCase("reloadshops")) {
@@ -864,6 +826,72 @@ public final class CleanShop extends JavaPlugin{
 			e.printStackTrace();
 		}
 		return true;
+	}
+		
+	public boolean setShopTeleport(Player player,String[] args)
+	{
+
+		if(args.length==0)
+		{
+		
+			ApplicableRegionSet ars = getRegions(player.getLocation());
+			Set<ProtectedRegion> regions=ars.getRegions();
+			if(regions.size()==0)
+			{
+				player.sendMessage(ChatColor.RED+"You need to be standing in a WorldGuard region to set the teleport! (Or you can use /setshopteleport [shop])");
+				return true;
+			}
+			else if(regions.size()>1)
+			{
+				player.sendMessage("You are standing in multiple regions and I don't know which one to use for the shop! Use /setShopTeleport <regionName> instead.");
+				return true;
+			}
+			else
+			{
+				ProtectedRegion[] r = new ProtectedRegion[1];
+				ProtectedRegion region=regions.toArray(r)[0];
+				
+				Shop shop=this.getShop(region);
+				if(shop!=null)
+				{
+					setTeleport(shop,player.getLocation());
+					player.sendMessage("Set teleport for shop "+shop.getRegion().getId()+" to your location.");
+					saveShops();
+				}
+				else
+					player.sendMessage(ChatColor.RED+"Couldn't find that shop!");
+				
+				return true;
+			}
+		}
+		else if(args.length==1)
+		{
+			ProtectedRegion region = worldGuard.getRegionManager(player.getWorld()).getRegion(args[0]);
+			if(region==null)
+			{
+				player.sendMessage(ChatColor.RED+"No regions could be found with name \""+args[0]+"\".");
+				return true;
+			}
+			else
+			{
+				if(shopExists(region))
+				{
+					Shop shop=this.getShop(region);
+					if(shop!=null)
+					{
+						setTeleport(shop,player.getLocation());
+						player.sendMessage("Set teleport for shop "+shop.getRegion().getId()+" to your location.");
+						saveShops();
+					}
+					else
+						player.sendMessage(ChatColor.RED+"Couldn't find that shop!");
+				}
+				else
+					player.sendMessage(ChatColor.RED+"No shop exists in region \""+args[0]+"\".");
+				return true;
+			}
+		}
+		return false;
 	}
 
 	public static Material matchMaterial(String s)
