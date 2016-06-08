@@ -62,54 +62,23 @@ public final class CleanShop extends JavaPlugin{
 			return new File(getDataFolder().getAbsolutePath(),"shops_temp.data");
 		}
 		
-		public void copyFile(File inputFile, File outputFile)
-		{
-			 InputStream inStream = null;
-		        OutputStream outStream = null;
-		        if(!outputFile.exists())
-					try {
-						outputFile.createNewFile();
-					} catch (IOException e1) {
-						e1.printStackTrace();
-					}
+ 		public static void copyFile(File in, File out) throws IOException {
+		   FileChannel inChannel = new
+		     FileInputStream(in).getChannel();
+		  FileChannel outChannel = new
+		      FileOutputStream(out).getChannel();
+		    try {
+	        	 inChannel.transferTo(0, inChannel.size(), outChannel);
+		  } 
+		 catch (IOException e) {
+		      throw e;
+		 }
+		 finally {
+		  if (inChannel != null) inChannel.close();
+		  if (outChannel != null) outChannel.close();
+		 }
+    	}
 
-		        try {
-					inStream = new FileInputStream(inputFile);
-				} catch (FileNotFoundException e) {
-					e.printStackTrace();
-				}
-		        try {
-					outStream = new FileOutputStream(outputFile);
-				} catch (FileNotFoundException e) {
-					e.printStackTrace();
-				}
-
-		        byte[] buffer = new byte[1024];
-
-
-		        int fileLength;
-		        try {
-					while ((fileLength = inStream.read(buffer)) > 0){
-
-					      outStream.write(buffer, 0, fileLength );
-
-					      }
-				} catch (IOException e) {
-					e.printStackTrace();
-				}
-
-		        try {
-					inStream.close();
-				} catch (IOException e) {
-					e.printStackTrace();
-				}
-		        try {
-					outStream.close();
-				} catch (IOException e) {
-					e.printStackTrace();
-				}
-		}
-		
 	 	public void onEnable() {
 	        getDataFolder().mkdirs();
 	 		nameToIDs = new Vector<NameToID>();
