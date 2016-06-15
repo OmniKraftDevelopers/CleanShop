@@ -1,7 +1,9 @@
 package net.omnikraft.CleanShop;
 
+import java.util.List;
 import java.util.Set;
 
+import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
@@ -10,10 +12,14 @@ import org.bukkit.block.DoubleChest;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.BlockBreakEvent;
+import org.bukkit.event.block.BlockExplodeEvent;
+import org.bukkit.event.entity.EntityExplodeEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.inventory.InventoryType;
 
 import com.sk89q.worldguard.protection.regions.ProtectedRegion;
+
+import net.md_5.bungee.api.ChatColor;
 
 public class EventListener implements Listener{
 	
@@ -41,27 +47,48 @@ public class EventListener implements Listener{
 		return null;
 	}
 	
-	@EventHandler
-	public void onBlockBreakEvent(BlockBreakEvent event) {
-		Set<ProtectedRegion> regions=plugin.getRegions(event.getBlock().getLocation()).getRegions();
+	public void handleChestDestruction(Block b,List<Block> explodedBlocks)
+    {
+    	Set<ProtectedRegion> regions=plugin.getRegions(b.getLocation()).getRegions();
 		
 		if(regions!=null)
 			for(ProtectedRegion p:regions)
 			{
-				if(p!=null&&plugin.shopExists(p)&&isChest(event.getBlock()))
+				if(p!=null&&plugin.shopExists(p))
 				{
-					BlockFace side=getDoubleChestSide(event.getBlock());
+					BlockFace side=getDoubleChestSide(b);
 					
 					if(side==null) //Single chest
 					{
-						plugin.clearSingleChest((Chest)event.getBlock().getState(),plugin.getShop(p));
+						plugin.clearSingleChest((Chest)b.getState(),plugin.getShop(p));
 					}
 					else //uuugggghhhh I have to deal with this freaking double chest
 					{
-						plugin.dealWithThisFreakingDoubleChest((Chest)event.getBlock().getState(),plugin.getShop(p),side);
+						plugin.dealWithThisFreakingDoubleChest((Chest)b.getState(),plugin.getShop(p),side,explodedBlocks);
 					}
 				}
 			}
+    }
+	
+	@EventHandler
+	public void onBlockBreakEvent(BlockBreakEvent event) {
+		Block b=event.getBlock();
+		if(isChest(b))
+			handleChestDestruction(b, null);
+	}
+	
+	@EventHandler
+	public void onEntityExplode(EntityExplodeEvent event) {
+		for(Block b:event.blockList())
+			if(isChest(b))
+				handleChestDestruction(b, event.blockList());
+	}	
+	
+	@EventHandler
+	public void onBlockExplodeEvent(BlockExplodeEvent event) {
+		Block b=event.getBlock();
+		if(isChest(b))
+			handleChestDestruction(b, null);
 	}
 
 	@EventHandler

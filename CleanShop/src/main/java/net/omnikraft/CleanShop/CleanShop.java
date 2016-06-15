@@ -1,17 +1,17 @@
 package net.omnikraft.CleanShop;
 
+import java.util.List;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
+import java.nio.channels.FileChannel;
 import java.nio.charset.Charset;
 import java.util.Collections;
 import java.util.Set;
@@ -24,6 +24,7 @@ import org.bukkit.ChatColor;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.World;
+import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
 import org.bukkit.block.Chest;
 import org.bukkit.block.DoubleChest;
@@ -39,7 +40,6 @@ import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 
 import com.sk89q.worldedit.BlockVector;
-import com.sk89q.worldguard.bukkit.WGBukkit;
 import com.sk89q.worldguard.bukkit.WorldGuardPlugin;
 import com.sk89q.worldguard.protection.ApplicableRegionSet;
 import com.sk89q.worldguard.protection.managers.RegionManager;
@@ -92,7 +92,7 @@ public final class CleanShop extends JavaPlugin{
 	 			return;
 	 		}
 	 		getServer().getPluginManager().registerEvents(new EventListener(this), this);
-	 		regionManager=worldGuard.getRegionManager(Bukkit.getWorld("world"));
+	 		regionManager=worldGuard.getRegionManager(Bukkit.getWorlds().get(0));
 
 			loadShops();
 	    }
@@ -161,7 +161,11 @@ public final class CleanShop extends JavaPlugin{
  				writer.write(obj.toString());
 	 			tickMethodID = getServer().getScheduler().scheduleSyncDelayedTask(this, new Runnable() {
 		 		    public void run() {
-			 			copyFile(getTempShopFile(), getShopFile());
+			 			try {
+							copyFile(getTempShopFile(), getShopFile());
+						} catch (IOException e) {
+							e.printStackTrace();
+						}
 		 		    }
 		 		    }, 1);
 	 		} catch (Exception e) {
@@ -384,7 +388,7 @@ public final class CleanShop extends JavaPlugin{
 	    }
 	    
 	    //uuuuuuuuugggggggggggghhhhhhhhhhhhhhhh
-	    public void dealWithThisFreakingDoubleChest(Chest c, Shop s, BlockFace side)
+	    public void dealWithThisFreakingDoubleChest(Chest c, Shop s, BlockFace side,List<Block> blockList)
 	    {
 	    	ChestData rm=null;
 			for(ChestData cd:s.chestData)
@@ -415,8 +419,8 @@ public final class CleanShop extends JavaPlugin{
 				}
 			if(rm!=null)
 				s.chestData.remove(rm);
-			
-			calculateChestStock((Chest)c.getWorld().getBlockAt(x, c.getY(), z).getState(),s);
+			if(blockList==null||!blockList.contains(c.getWorld().getBlockAt(x, c.getY(), z)))
+				calculateChestStock((Chest)c.getWorld().getBlockAt(x, c.getY(), z).getState(),s);
 	    }
 	    
 	    public void calculateChestStock(Chest c,Shop s)
@@ -468,6 +472,8 @@ public final class CleanShop extends JavaPlugin{
 	    	}
 	    	data.setItems(dat);
 	    }
+	    
+	   
 	    
 		public boolean onCommand(CommandSender sender, Command cmd, String label, String[] args) {
 	    	try{
@@ -708,11 +714,23 @@ public final class CleanShop extends JavaPlugin{
 	    		return false;
 	    	}else if (cmd.getName().equalsIgnoreCase("wipestock"))
 	    	{
-	    		for(Shop s:this.shops)
-	    			s.chestData.clear();
-	    		sender.sendMessage(ChatColor.GREEN+"All shop stocks have been wiped. Re-opening chests will refresh stock.");
-				saveShops();
-	    		return true;
+	    		if(args.length==0)
+	    		{
+		    		for(Shop s:this.shops)
+		    			s.chestData.clear();
+		    		sender.sendMessage(ChatColor.GREEN+"All shop stocks have been wiped. Re-opening chests will refresh stock.");
+					saveShops();
+		    		return true;
+	    		}
+	    		else if(args.length==1)
+	    		{
+	    			for(Shop s:this.shops)
+	    				if(s.getRegion().getId().toLowerCase().equals(args[0].toLowerCase()))
+	    					s.chestData.clear();
+		    		sender.sendMessage(ChatColor.GREEN+"The shop stocks of shop "+args[0]+" have been wiped. Re-opening chests will refresh stock.");
+					saveShops();
+		    		return true;
+	    		}
 	    	}
 	    	else if (cmd.getName().equalsIgnoreCase("tpshop")) {
 	    		if(sender instanceof Player)
