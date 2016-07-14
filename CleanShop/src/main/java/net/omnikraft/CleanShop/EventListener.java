@@ -1,9 +1,8 @@
 package net.omnikraft.CleanShop;
 
 import java.util.List;
-import java.util.Set;
+import java.util.Vector;
 
-import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
@@ -18,8 +17,6 @@ import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.inventory.InventoryType;
 
 import com.sk89q.worldguard.protection.regions.ProtectedRegion;
-
-import net.md_5.bungee.api.ChatColor;
 
 public class EventListener implements Listener{
 	
@@ -49,7 +46,7 @@ public class EventListener implements Listener{
 	
 	public void handleChestDestruction(Block b,List<Block> explodedBlocks)
     {
-    	Set<ProtectedRegion> regions=plugin.getRegions(b.getLocation()).getRegions();
+    	Vector<ProtectedRegion> regions=plugin.getRegions(b.getLocation());
 		
 		if(regions!=null)
 			for(ProtectedRegion p:regions)
@@ -96,11 +93,11 @@ public class EventListener implements Listener{
 		//long time=System.nanoTime();
 		if(event.getInventory().getType()==InventoryType.CHEST&&plugin.shopScan)
 		{
-			Set<ProtectedRegion> regions=null;
+			Vector<ProtectedRegion> regions=null;
 			if(event.getInventory().getHolder() instanceof Chest)
-				regions=plugin.getRegions(((Chest)event.getInventory().getHolder()).getLocation()).getRegions();
+				regions=plugin.getRegions(((Chest)event.getInventory().getHolder()).getLocation());
 			if(event.getInventory().getHolder() instanceof DoubleChest)
-				regions=plugin.getRegions(((DoubleChest)event.getInventory().getHolder()).getLocation()).getRegions();
+				regions=plugin.getRegions(((DoubleChest)event.getInventory().getHolder()).getLocation());
 			if(regions!=null)
 				for(ProtectedRegion p:regions)
 				{
