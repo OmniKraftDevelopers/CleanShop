@@ -12,7 +12,6 @@ import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.nio.channels.FileChannel;
 import java.nio.charset.Charset;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
@@ -92,15 +91,23 @@ public final class CleanShop extends JavaPlugin{
 	 			return;
 	 		}
 	 		getServer().getPluginManager().registerEvents(new EventListener(this), this);
+	 		
+
+			loadShops();
+	    }
+	 	
+	 	public void updateRegionManagers()
+	 	{
+	 		regionManagers.clear();
 	 		for(World w:Bukkit.getWorlds())
 	 		{
 	 			RegionManager r = worldGuard.getRegionManager(w);
 	 			if(r!=null)
+	 			{
 	 				regionManagers.add(r);
+	 			}
 	 		}
-
-			loadShops();
-	    }
+	 	}
 	 	
 		public void saveShops()
 	 	{
@@ -372,7 +379,7 @@ public final class CleanShop extends JavaPlugin{
 	    public Shop getShop(ProtectedRegion r)
 	    {
 	    	for(Shop s:shops)
-	    		if(s.getRegion().equals(r))
+	    		if(s!=null&&s.getRegion()!=null&&s.getRegion().equals(r))
 	    			return s;
 	    	return null;
 	    }
@@ -501,6 +508,7 @@ public final class CleanShop extends JavaPlugin{
 	   
 	    
 		public boolean onCommand(CommandSender sender, Command cmd, String label, String[] args) {
+			updateRegionManagers();
 	    	try{
 	    	if (cmd.getName().equalsIgnoreCase("createshop")) {
 	    		if(sender instanceof Player)
@@ -517,6 +525,9 @@ public final class CleanShop extends JavaPlugin{
 		    			else if(regions.size()>1)
 		    			{
 							sender.sendMessage("You are standing in multiple regions and I don't know which one to use for the shop! Use /createShop <regionName> instead.");
+							sender.sendMessage("These are the regions you're standing in:");
+							for(int i=0;i<regions.size();i++)
+								sender.sendMessage(ChatColor.BLUE+regions.get(i).getId());
 							return true;
 		    			}
 		    			else
@@ -538,6 +549,7 @@ public final class CleanShop extends JavaPlugin{
 	    			}
 	    			else if(args.length==1)
 	    			{
+		    			Vector<ProtectedRegion> regions=getRegions(player.getLocation());
 	    				ProtectedRegion region = getRegion(args[0]);
 	    				if(region==null)
 	    				{
@@ -550,6 +562,11 @@ public final class CleanShop extends JavaPlugin{
 	    					{
 	    						createShop(region);
 	    						sender.sendMessage("A shop has been added to region: "+ChatColor.GREEN+args[0]);
+	    						if(regions.contains(region))
+	    						{
+		    						sender.sendMessage(ChatColor.YELLOW+"This shop's teleport has been set to your location. Use /sst to change it.");
+		    						setShopTeleport(player, args);
+	    						}
 	    			    		saveShops();
 	    					}
 	    					else

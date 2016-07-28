@@ -1,9 +1,11 @@
 name: CleanShop
 main: net.omnikraft.CleanShop.CleanShop
-version: 1.1.5
+version: 1.1.6
 description: Allows users to search shops for items they want.
 author: PeculiarCarrot
 depend: [WorldGuard]
+load: POSTWORLD
+softdepend: [Multiverse]
 
 commands:
    createshop:
