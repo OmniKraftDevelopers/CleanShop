@@ -1,10 +1,12 @@
-package net.omnikraft.CleanShop;
+package net.omnikraft.CleanShop.chest;
 
 import org.bukkit.Material;
 
 public class ChestData {
 	private Material[] items;
-	int x,y,z;
+	public int x;
+	public int y;
+	public int z;
 	
 	public ChestData(int x, int y, int z, Material[] items)
 	{

@@ -18,6 +18,10 @@ import org.bukkit.event.inventory.InventoryType;
 
 import com.sk89q.worldguard.protection.regions.ProtectedRegion;
 
+import net.omnikraft.CleanShop.util.ChestUtils;
+import net.omnikraft.CleanShop.util.FileHandler;
+import net.omnikraft.CleanShop.util.ShopUtils;
+
 public class EventListener implements Listener{
 	
 	private CleanShop plugin;
@@ -46,22 +50,22 @@ public class EventListener implements Listener{
 	
 	public void handleChestDestruction(Block b,List<Block> explodedBlocks)
     {
-    	Vector<ProtectedRegion> regions=plugin.getRegions(b.getLocation());
+    	Vector<ProtectedRegion> regions=ShopUtils.getRegions(b.getLocation());
 		
 		if(regions!=null)
 			for(ProtectedRegion p:regions)
 			{
-				if(p!=null&&plugin.shopExists(p))
+				if(p!=null&&ShopUtils.shopExists(p))
 				{
 					BlockFace side=getDoubleChestSide(b);
 					
 					if(side==null) //Single chest
 					{
-						plugin.clearSingleChest((Chest)b.getState(),plugin.getShop(p));
+						ChestUtils.clearSingleChest((Chest)b.getState(),ShopUtils.getShop(p));
 					}
 					else //uuugggghhhh I have to deal with this freaking double chest
 					{
-						plugin.dealWithThisFreakingDoubleChest((Chest)b.getState(),plugin.getShop(p),side,explodedBlocks);
+						ChestUtils.dealWithThisFreakingDoubleChest((Chest)b.getState(),ShopUtils.getShop(p),side,explodedBlocks);
 					}
 				}
 			}
@@ -91,25 +95,25 @@ public class EventListener implements Listener{
 	@EventHandler
 	public void onInventoryCloseEvent(InventoryCloseEvent event) {
 		//long time=System.nanoTime();
-		if(event.getInventory().getType()==InventoryType.CHEST&&plugin.shopScan)
+		if(event.getInventory().getType()==InventoryType.CHEST&&CleanShop.shopScan)
 		{
 			Vector<ProtectedRegion> regions=null;
 			if(event.getInventory().getHolder() instanceof Chest)
-				regions=plugin.getRegions(((Chest)event.getInventory().getHolder()).getLocation());
+				regions=ShopUtils.getRegions(((Chest)event.getInventory().getHolder()).getLocation());
 			if(event.getInventory().getHolder() instanceof DoubleChest)
-				regions=plugin.getRegions(((DoubleChest)event.getInventory().getHolder()).getLocation());
+				regions=ShopUtils.getRegions(((DoubleChest)event.getInventory().getHolder()).getLocation());
 			if(regions!=null)
 				for(ProtectedRegion p:regions)
 				{
 					if(p!=null)
-						if(plugin.shopExists(p))
+						if(ShopUtils.shopExists(p))
 						{
 							//plugin.calculateShopStock(plugin.getShop(p));
 							if(event.getInventory().getHolder() instanceof Chest)
-								plugin.calculateChestStock((Chest)event.getInventory().getHolder(), plugin.getShop(p));
+								ChestUtils.calculateChestStock((Chest)event.getInventory().getHolder(), ShopUtils.getShop(p));
 							else
-								plugin.calculateChestStock((DoubleChest)event.getInventory().getHolder(), plugin.getShop(p));
-							plugin.saveShops();
+								ChestUtils.calculateChestStock((DoubleChest)event.getInventory().getHolder(), ShopUtils.getShop(p));
+							FileHandler.saveShops();
 						}
 				}
 		}

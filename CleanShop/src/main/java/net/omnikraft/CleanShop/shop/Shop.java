@@ -1,4 +1,4 @@
-package net.omnikraft.CleanShop;
+package net.omnikraft.CleanShop.shop;
 
 import java.util.Vector;
 
@@ -7,12 +7,14 @@ import org.bukkit.Material;
 
 import com.sk89q.worldguard.protection.regions.ProtectedRegion;
 
+import net.omnikraft.CleanShop.chest.ChestData;
+
 public class Shop {
 	
 	private ProtectedRegion region;
 	private Location location;
 	private Vector<Material> stock=new Vector<Material>();
-	Vector<ChestData> chestData = new Vector<ChestData>();
+	public Vector<ChestData> chestData = new Vector<ChestData>();
 	
 	public Vector<Material> getStock()
 	{

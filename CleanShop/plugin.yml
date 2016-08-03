@@ -1,17 +1,22 @@
 name: CleanShop
 main: net.omnikraft.CleanShop.CleanShop
-version: 1.1.6
+version: 1.1.11
 description: Allows users to search shops for items they want.
 author: PeculiarCarrot
 depend: [WorldGuard]
 load: POSTWORLD
-softdepend: [Multiverse]
+softdepend: [Multiverse-Core]
 
 commands:
    createshop:
       description: Creates a new shop in the region the user is standing in
       usage: /createShop [region]
       permission: cleanshop.createshop
+      permission-message: You don't have permission!
+   debugcleanshop:
+      description: Enables or disables debugging output for CleanShop
+      usage: /debugcleanshop [true:false]
+      permission: cleanshop.debugcleanshop
       permission-message: You don't have permission!
    setshopscan:
       description: Sets the automatic scanning of chests

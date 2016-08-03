@@ -1,4 +1,4 @@
-package net.omnikraft.CleanShop;
+package net.omnikraft.CleanShop.util;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
